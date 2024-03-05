@@ -8,7 +8,7 @@
 
 Склонировать репозиторий (или скачать архив с гитхаба).
 
-Перейти в директорию с проектом и создать виртуальное окружение:
+Перейти в директорию `backend` и создать виртуальное окружение:
 
 ```
 python -m venv env
@@ -34,9 +34,9 @@ python fill_db.py
 
 ## Запуск сервера
 
-Перейти в директорию с проектом.
+Перейти в директорию `backend`.
 
-Активировать виртуальное окружение:
+Активировать виртуальное окружение (если не было активировано ранее):
 
 ```
 env\Scripts\activate
@@ -73,7 +73,7 @@ curl -i -H "Content-Type: application/json" -d "{\"title\": \"Hell machine\", \"
 Обновление машины (PUT-запрос):
 
 ```
-curl -i -X PUT -H "Content-Type: application/json" -d "{\"id\": 5, \"title\": \"Good machine\", \"power\": 777}" http://127.0.0.1:5000/energy/api/machines/5
+curl -i -X PUT -H "Content-Type: application/json" -d "{\"title\": \"Good machine\", \"power\": 777}" http://127.0.0.1:5000/energy/api/machines/5
 ```
 
 Удаление 5-й машины (DELETE-запрос):
@@ -90,6 +90,12 @@ curl -i -X DELETE http://127.0.0.1:5000/energy/api/machines/5
 curl -i http://127.0.0.1:5000/energy/api/products
 ```
 
+Получение продукции 1-го цеха (GET-запрос):
+
+```
+curl -i http://127.0.0.1:5000/energy/api/products?dep=1
+```
+
 Получение 2-го продукта (GET-запрос):
 
 ```
@@ -98,11 +104,13 @@ curl -i http://127.0.0.1:5000/energy/api/products/2
 
 Добавление продукта (POST-запрос):
 
-не работает:
+не работает (поле operations в формате json):
 
 ```
 curl -i -H "Content-Type: application/json" -d "{\"title\": \"Hellstone\", \"quantity\": 6, \"department\":1, \"operations\": \"\"[{\"machine\": 3, \"power_factor\": 0.65, \"duration\": 30},{\"machine\": 1, \"power_factor\": 0.7, \"duration\": 25}]\"\"}" http://127.0.0.1:5000/energy/api/products
 ```
+
+примитивная проверка:
 
 ```
 curl -i -H "Content-Type: application/json" -d "{\"title\": \"Hellstone\", \"quantity\": 6, \"department\":1, \"operations\": \"operations list...\"}" http://127.0.0.1:5000/energy/api/products
@@ -231,7 +239,7 @@ http://127.0.0.1:5000/energy/api/machines
 При успешном создании возвращается код 201 и сообщение:
 
 ```json
-{info: 'Machine added'}
+{"info": "Machine added"}
 ```
 
 ### Редактирование машины
@@ -254,7 +262,7 @@ http://127.0.0.1:5000/energy/api/machines
 При успешном обновлении возвращается код 201 и сообщение:
 
 ```json
-{info: 'Machine updated'}
+{"info": "Machine updated"}
 ```
 
 ### Удаление машины
@@ -268,6 +276,6 @@ http://127.0.0.1:5000/energy/api/machines/<machine_ID>
 При успешном удалении возвращается код 200 и сообщение:
 
 ```json
-{info: 'Machine deleted'}
+{"info": "Machine deleted"}
 ```
 
