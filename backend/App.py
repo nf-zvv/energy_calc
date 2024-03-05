@@ -1,3 +1,4 @@
+import math
 from flask import Flask, jsonify, make_response, abort, request, Response
 from flask_cors import CORS
 import sqlalchemy as db
@@ -33,15 +34,32 @@ CORS(app)
 # Получение списка машин
 @app.route('/energy/api/machines', methods=['GET'])
 def get_machines():
-    with engine.begin() as conn:
-        results = conn.execute(
-            db.select(machines_table)
-        )
-        machines_list = results.fetchall()
-        if not machines_list:
-            abort(404)
-        machines = [dict(zip(results.keys(),row)) for row in machines_list]
-        return jsonify({'data': machines, 'last_page': 1})
+    page = request.args.get('page', type = int)
+    size = request.args.get('size', type = int)
+    if page is not None and size is not None:
+        with engine.begin() as conn:
+            count = conn.execute(
+                db.select(db.func.count("*")).select_from(machines_table)
+            )
+            count = count.fetchone()[0]
+            total_pages = math.ceil(count/size)
+        with engine.begin() as conn:
+            results = conn.execute(
+                db.select(machines_table).limit(size).offset(page-1)
+            )
+    else:
+        with engine.begin() as conn:
+            results = conn.execute(
+                db.select(machines_table)
+            )
+    machines_list = results.fetchall()
+    if not machines_list:
+        abort(404)
+    machines = [dict(zip(results.keys(),row)) for row in machines_list]
+    try:
+        return jsonify({'data': machines, 'last_page': total_pages})
+    except NameError:
+        return jsonify({'data': machines})
     
 
 # Получение одной машины по ID
