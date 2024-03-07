@@ -1,4 +1,5 @@
 import math
+import json
 from flask import Flask, jsonify, make_response, abort, request, Response
 from flask_cors import CORS
 import sqlalchemy as db
@@ -36,6 +37,7 @@ CORS(app)
 def get_machines():
     page = request.args.get('page', type = int)
     size = request.args.get('size', type = int)
+    total_pages = None
     if page is not None and size is not None:
         with engine.begin() as conn:
             count = conn.execute(
@@ -43,9 +45,8 @@ def get_machines():
             )
             count = count.fetchone()[0]
             total_pages = math.ceil(count/size)
-        with engine.begin() as conn:
             results = conn.execute(
-                db.select(machines_table).limit(size).offset(page-1)
+                db.select(machines_table).limit(size).offset((page-1)*size)
             )
     else:
         with engine.begin() as conn:
@@ -56,9 +57,9 @@ def get_machines():
     if not machines_list:
         abort(404)
     machines = [dict(zip(results.keys(),row)) for row in machines_list]
-    try:
+    if total_pages is not None:
         return jsonify({'data': machines, 'last_page': total_pages})
-    except NameError:
+    else:
         return jsonify({'data': machines})
     
 
@@ -125,21 +126,51 @@ def delete_machine(machine_id):
 # Получение списка продукции
 @app.route('/energy/api/products', methods=['GET'])
 def get_products():
+    page = request.args.get('page', type = int)
+    size = request.args.get('size', type = int)
     department = request.args.get('dep', type = int)
-    with engine.begin() as conn:
-        if department is not None:
+    total_pages = None
+    if department is not None and page is not None and size is not None:
+        with engine.begin() as conn:
+            count = conn.execute(
+                db.select(db.func.count("*")).select_from(products_table)
+            )
+            count = count.fetchone()[0]
+            total_pages = math.ceil(count/size)
+            results = conn.execute(
+                db.select(products_table).where(products_table.c.department == department).limit(size).offset((page-1)*size)
+            )
+    elif page is not None and size is not None:
+        with engine.begin() as conn:
+            count = conn.execute(
+                db.select(db.func.count("*")).select_from(products_table)
+            )
+            count = count.fetchone()[0]
+            total_pages = math.ceil(count/size)
+            results = conn.execute(
+                db.select(products_table).limit(size).offset((page-1)*size)
+            )
+    elif department is not None:
+        with engine.begin() as conn:
             results = conn.execute(
                 db.select(products_table).where(products_table.c.department == department)
             )
-        else:
+    else:
+        with engine.begin() as conn:
             results = conn.execute(
                 db.select(products_table)
             )
-        products_list = results.fetchall()
-        if not products_list:
-            abort(404)
-        products = [dict(zip(results.keys(),row)) for row in products_list]
-        return jsonify({'data': products, 'last_page': 1})
+    products_list = results.fetchall()
+    if not products_list:
+        abort(404)
+    products = [dict(zip(results.keys(),row)) for row in products_list]
+    for product in products:
+        operations = product['operations']
+        product['operations'] = json.loads(operations)
+    if total_pages is not None:
+        return jsonify({'data': products, 'last_page': total_pages})
+    else:
+        return jsonify({'data': products})
 
 
 # Получение одного продукта по ID
@@ -150,10 +181,13 @@ def get_product_id(product_id):
             db.select(products_table).where(products_table.c.id == product_id)
         )
         products_list = results.fetchall()
-        if not products_list:
-            abort(404)
-        product = [dict(zip(results.keys(),row)) for row in products_list]
-        return jsonify({'data': product})
+    if not products_list:
+        abort(404)
+    products = [dict(zip(results.keys(),row)) for row in products_list]
+    for product in products:
+        operations = product['operations']
+        product['operations'] = json.loads(operations)
+    return jsonify({'data': products})
 
 
 # Создание продукта
@@ -161,7 +195,7 @@ def get_product_id(product_id):
 def create_product():
     product = request.get_json()
     with engine.begin() as conn:
-        query = products_table.insert().values(product)
+        query = products_table.insert().values({'title':product['title'], 'operations':json.dumps(product['operations']), 'quantity':product['quantity'], 'department':product['department']})
         result = conn.execute(query)
         return jsonify({'info':'Product added'}), 201, {'Content-Type': 'application/json'}
 
@@ -179,7 +213,7 @@ def update_product(product_id):
     # Запись существует, значит можно обновлять
     product = request.get_json()
     with engine.begin() as conn:
-        query = products_table.update().where(products_table.c.id == product_id).values({'title':product['title'], 'operations':product['operations'], 'quantity':product['quantity'], 'department':product['department']})
+        query = products_table.update().where(products_table.c.id == product_id).values({'title':product['title'], 'operations':json.dumps(product['operations']), 'quantity':product['quantity'], 'department':product['department']})
         result = conn.execute(query)
         return jsonify({'info':'Product updated'}), 201, {'Content-Type': 'application/json'}
 
