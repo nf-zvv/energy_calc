@@ -236,6 +236,55 @@ def delete_product(product_id):
         return jsonify({'info':'Product deleted'}), 200, {'Content-Type': 'application/json'}
 
 
+# Расчет потребления энергии цехом/предприятием
+@app.route('/energy/api/consumption', methods=['GET'])
+def get_consumption():
+    department = request.args.get('dep', type = int)
+    total_pages = None
+    if department is not None:
+        with engine.begin() as conn:
+            results = conn.execute(
+                db.select(products_table).where(products_table.c.department == department)
+            )
+    else:
+        with engine.begin() as conn:
+            results = conn.execute(
+                db.select(products_table)
+            )
+    products_list = results.fetchall()
+    if not products_list:
+        abort(404)
+    products = [dict(zip(results.keys(),row)) for row in products_list]
+    for product in products:
+        operations = product['operations']
+        product['operations'] = json.loads(operations)
+    
+    # Расчет энергопотребления
+    power_consumption = []
+    for product in products:
+        item = {}
+        item['id'] = product['id']
+        item['title'] = product['title']
+        energy = 0
+        for operation in product['operations']:
+            machine_id = operation['machine']
+            machine_power = get_machine_power(machine_id)
+            energy += machine_power * float(operation['power_factor']) * float(operation['duration'])
+        item['energy'] = energy
+        item['energy_full'] = energy * float(product['quantity'])
+        power_consumption.append(item)
+    return jsonify({'data': power_consumption})
+
+
+def get_machine_power(machine_id):
+    with engine.begin() as conn:
+        results = conn.execute(
+            db.select(machines_table.c.power).where(machines_table.c.id == machine_id)
+        )
+    machine_power = results.fetchone()[0]
+    return machine_power
+
+
 
 @app.before_request
 def handle_preflight():
